@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Analytics } from "@/components/analytics";
 import { ModeToggle } from "@/components/mode-toggle";
 import { ReactNode } from "react";
+import Image from "next/image";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -27,10 +28,22 @@ export default function RootLayout({ children }: RootLayoutProps) {
           <div className="max-w-2xl mx-auto py-10 px-4">
             <header>
               <div className="flex items-center justify-between">
-                <ModeToggle />
-                <nav className="ml-auto text-sm font-medium space-x-6">
+                <div className="flex items-center gap-2">
+                  <Image
+                    src="/seoyeon-blog-icon.png"
+                    alt="seoyeon-blog-icon"
+                    width={40}
+                    height={40}
+                    className={"rounded-full border-2 border-slate-300"}
+                  />
+                  <span className="font-bold text-lg text-slate-800 dark:text-slate-200">
+                    Seoyeon Blog
+                  </span>
+                </div>
+                <nav className="ml-auto text-sm font-medium space-x-6 flex items-center">
                   <Link href="/">Home</Link>
                   <Link href="/about">About</Link>
+                  <ModeToggle />
                 </nav>
               </div>
             </header>
