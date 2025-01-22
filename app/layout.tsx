@@ -21,6 +21,15 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <title>Seoyeon Blogs</title>
+      <meta name="description" content="Frontend Developer Seoyeon's Blog" />
+      <meta name="keywords" content="Frontend, Developer, Blog, Seoyeon" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <meta property="og:title" content="Seoyeon Blog" />
+      <meta property="og:description" content="Frontend Developer Seoyeon's Blog" />
+      <meta property="og:type" content="website" />
+      <meta property="og:url" content="https://seoyeon-next-blog-uw4w.vercel.app/" />
+      <meta property="og:image" content="/seoyeon-blog-meta-image.png" />
       <body
         className={`antialiased min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-50 ${inter.className}`}
       >
