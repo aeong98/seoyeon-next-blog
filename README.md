@@ -1,4 +1,4 @@
 # Seoyeon Next.js Blog
 
 
-https://seoyeon-next-blog-uw4w.vercel.app/
+https://seoyeon-next-blog.vercel.app/
