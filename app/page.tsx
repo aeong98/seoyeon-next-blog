@@ -2,7 +2,22 @@ import Link from "next/link";
 import path from "path";
 import * as fs from "node:fs";
 import compileBlogMdx from "@/utils/compileBlogMdx";
+import { Metadata } from "next";
+import getBlogContentFromParams from "@/utils/getBlogContentFromParams";
 
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: "Seoyeon Blog",
+    description: "Frontend Developer Seoyeon's Blog",
+    openGraph: {
+      type: "website",
+      url: "https://seoyeon-next-blog.vercel.app/",
+      title: "Seoyeon Blog",
+      description: "Frontend Developer Seoyeon's Blog",
+      images: ["/seoyeon-blog-meta-image.png"],
+    },
+  };
+}
 export default async function Home() {
   const postsDirectory = path.join(process.cwd(), "content/posts");
   const filenames = fs.readdirSync(postsDirectory);
