@@ -1,4 +1,3 @@
-import { allPosts } from "@/.contentlayer/generated";
 import Link from "next/link";
 import path from "path";
 import * as fs from "node:fs";
