@@ -18,6 +18,12 @@ export async function generateMetadata({ params }: PostProps): Promise<Metadata>
   return {
     title: post.title,
     description: post.description,
+    openGraph: {
+      title: post.title,
+      description: post.description,
+      releaseDate: post.date,
+      images: [post.imageUrl],
+    },
   };
 }
 
