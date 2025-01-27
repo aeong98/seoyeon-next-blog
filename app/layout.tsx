@@ -41,11 +41,11 @@ export default function RootLayout({ children }: RootLayoutProps) {
                   <Image
                     src="/seoyeon-blog-icon.png"
                     alt="seoyeon-blog-icon"
-                    width={40}
-                    height={40}
+                    width={30}
+                    height={30}
                     className={"rounded-full border-2 border-slate-300"}
                   />
-                  <span className="font-bold text-lg text-slate-800 dark:text-slate-200">
+                  <span className="font-bold text-base sm:text-lg text-slate-800 dark:text-slate-200">
                     Seoyeon Blog
                   </span>
                 </div>
