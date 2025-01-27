@@ -12,9 +12,9 @@ date: "2024-10-01"
 
 ## stictNullChecks false 환경에서 타입추론이 제대로 되지 않는 문제가 발견됐다
 
-z.object() 에서 필수값과 옵셔널 속성이 제대로 추론되지 않는 이슈가 발생했다.
+Zod 객체 (z.object())에서 필수값과 옵셔널 속성이 제대로 추론되지 않는 이슈가 발생했다.
 
-예를 들어 아래아 같이 스키마를 정의해두면 orderShippingCode는 필수값, shippingCompanyId는 옵셔널 값으로 추론이 되어야 하는데 둘다 옵셔널값으로 추론되는것이 아닌가..😮‍💨
+예를 들어 아래와 같이 스키마를 정의해두면 orderShippingCode는 필수값, shippingCompanyId는 옵셔널 값으로 추론이 되어야 하는데 둘다 옵셔널값으로 추론되는것이 아닌가..😮‍💨
 
 ```tsx
 const orderShippingBulkUpdateInputSchema = z.object({
@@ -32,7 +32,7 @@ const orderShippingBulkUpdateInputSchema = z.object({
 
 Zod로 파싱한 객체를 GraphQL mutation의 input 값으로 사용하는 경우가 대부분이 었는데, 이때 Typescript의 반공변성으로 인해 더 넓은 타입(옵셔널 타입)을 더 좁은 타입(필수 타입)에 할당할 수 없어 꼭 해결해야 하는 문제였다.
 
-두눈을 의심하면서 급하게 zod 에 올라온 이슈들을 뒤적이기 시작했다. 다행히도 [비슷한 이슈](https://github.com/colinhacks/zod/discussions/2160)가 이미 올라와 있었다. 어드민 프로젝트의 Typescript stictNullChecks  가 false로 되어있는 것이 문제였다.
+두눈을 의심하면서 급하게 zod 에 올라온 이슈들을 뒤적이기 시작했다. [비슷한 이슈](https://github.com/colinhacks/zod/discussions/2160)가 이미 올라와 있었다. 어드민 프로젝트의 Typescript stictNullChecks 가 false로 되어있는 것이 문제였다.
 
 <Image src={'/zod/blog-image-1.png'} alt={'zod-type-infer-issue-image'}/>
 
@@ -45,7 +45,6 @@ Zod로 파싱한 객체를 GraphQL mutation의 input 값으로 사용하는 경�
 지금 당장 strictNullChecks 설정을 변경할 수는 없었기에 급하게 z.object()의 반환 타입을 확인해봤다. 스키마에 정의된 객체의 각 속성 타입을 잘 읽어서 서커스하면 완벽하지는 않아도, 어느 정도 추론되는 커스텀 타입을 만들 수 있을 것 같았다.
 
 <Image src={'/zod/blog-image-3.png'} alt={'zod-type-infer-test-image'}/>
-
 
 개발에 필요한 딱 아래 두개 조건을 충족하는 타입을 만들기로 목표를 세웠다.
 
