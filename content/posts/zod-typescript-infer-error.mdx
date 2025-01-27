@@ -34,18 +34,18 @@ Zod로 파싱한 객체를 GraphQL mutation의 input 값으로 사용하는 경�
 
 두눈을 의심하면서 급하게 zod 에 올라온 이슈들을 뒤적이기 시작했다. 다행히도 [비슷한 이슈](https://github.com/colinhacks/zod/discussions/2160)가 이미 올라와 있었다. 어드민 프로젝트의 Typescript stictNullChecks  가 false로 되어있는 것이 문제였다.
 
-![image.png](attachment:81504758-1406-4988-81c9-ca4426dfc711:image.png)
+<Image src={'/zod/blog-image-1.png'} alt={'zod-type-infer-issue-image'}/>
 
 좋은 해결책이 있나 싶어 답변들도 살펴봤는데 strictNullCheck 옵션을 true로 변경하라는 답변만 있을 뿐, 별다른 뾰족한 수가 없었다..
 
 > `strictNullCheck: false`인 환경에서는 모든 타입이 암시적으로 `null` 또는 `undefined`를 포함할 수 있는데, 이로 인해 Zod의 `z.infer`는 모든 속성을 옵셔널로 판단하는 것 같았다.
 
-
-![image.png](attachment:3f6b3112-3245-4c5c-9bf3-a71ce2c333e5:image.png)
+<Image src={'/zod/blog-image-2.png'} alt={'zod-type-infer-issue-image'}/>
 
 지금 당장 strictNullChecks 설정을 변경할 수는 없었기에 급하게 z.object()의 반환 타입을 확인해봤다. 스키마에 정의된 객체의 각 속성 타입을 잘 읽어서 서커스하면 완벽하지는 않아도, 어느 정도 추론되는 커스텀 타입을 만들 수 있을 것 같았다.
 
-![image.png](attachment:be1d0dcc-aea2-486c-9807-2c6936ae3bdc:image.png)
+<Image src={'/zod/blog-image-3.png'} alt={'zod-type-infer-test-image'}/>
+
 
 개발에 필요한 딱 아래 두개 조건을 충족하는 타입을 만들기로 목표를 세웠다.
 
@@ -104,7 +104,7 @@ export type InferZodSchemaProperties<T extends ZodTypeAny> = {
 
 그리고 위 타입을 적용했을때의 결과!!  optional() 메소드를 적용한 shippingCompanayId 가 옵셔널로 잘 추론되는 것을 확인할 수 있다 😇
 
-![image.png](attachment:93dd965b-dc57-4ecb-937c-e65d1798606e:image.png)
+<Image src={'/zod/blog-image-4.png'} alt={'zod-type-infer-test-image'}/>
 
 ## 소스코드 설명
 
@@ -296,3 +296,7 @@ export type InferZodSchemaResult<T extends ZodTypeAny> = SimplifyObject<_Infer<T
 이전까지는 타입스크립트의 제네릭, 조건부 타입, 재귀 타입과 같은 고급 기능에 대해 약간의 공포감(?)을 갖고 있었는데, 복잡한 타입 문제도 작은 것부터 해결해나가면 결국 문제를 해결할 수 있다는 교훈을 얻은 것이 가장 큰 수확이라고 생각한다.
 
 비슷한 Zod 타입 추론이슈를 겪게된 사람 혹은 타입스크립트의 고급 타입 기능을 사용하는데 어려움을 겪는 사람들에게 나의 블로그 글이 도움이 되길 바란다.
+
+## 참고하면 좋을 자료
+- [https://www.typescriptlang.org/ko/docs/handbook/2/conditional-types.html](https://www.typescriptlang.org/ko/docs/handbook/2/conditional-types.html)
+- [infer, never만 보면 두려워지는 당신을 위한 고급 TypeScript](https://d2.naver.com/helloworld/7472830)

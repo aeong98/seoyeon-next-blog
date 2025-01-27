@@ -12,7 +12,7 @@ async function compileBlogMdx(fileContent: string) {
     source: fileContent,
     options: { parseFrontmatter: true },
     components: {
-      Image: (props) => <Image {...props} />,
+      Image: (props) => <Image {...props} layout={"intrinsic"} width={1000} height={1000} />,
       code: ({ children, className }) => {
         const language = className?.replace("language-", "");
         if (!language) {
