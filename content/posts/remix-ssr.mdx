@@ -1,0 +1,290 @@
+---
+title: Remix의 SSR, React 18 renderToPipeableStream을 위주로 살펴보기
+description: Remix 프로젝트를 생성하면서 entry.server.tsx 파일에 있는 renderToPipeableStream를 발견했다. 어떤 역할을 하는 함수인지 알아보자 💪
+date: "2025-02-02"
+imageUrl: /ssr/ssr-blog-image-3.png
+---
+
+주말에 React 공식 문서를 볼일이 있어서 둘러보다가 Introduction 부분 즈음에서 SSR 프레임워크로 Remix를 추천하는 문장을 발견했다. 평소에 한번 사용해 봐야겠다고 생각하고 있던 프레임워크라 Remix 프로젝트를 생성해봤고, 평소 Next.js 만을 사용해왔던 내게 생소한 `entry.server.tsx`, `entry.client.tsx` 파일을 보게 되었다.
+
+entry.server.tsx 즉, 서버에서 실행되는 파일의 handleBrowserRequest라는 함수가 눈에 들어왔다. (Remix v2.15.3 기준)
+
+<Image src={'/ssr/ssr-blog-image-1.png'} alt={'remix-ssr-image-1'} />
+
+Server-side에서 HTML을 생성하게 스트리밍 HTTP 응답을 보내는 함수인 것 같았다.
+
+생각보다 간단하게 구현이 되어 있단 생각이 들었다 🧐
+
+> Next.js가 SSR쪽 로직이 많이 추상화 되어있고, 또 최근에 복잡도가 높아지고 있어서 피로감을 느끼던 와중에 비교적 익숙하거나, 들어본적이 있는 함수(react 에서 import된..)들로 간단하게 구성된 SSR 로직을 보니깐 흥미가 생겼다.
+>
+
+사실 SSR에서 Remix가 담당하고 있는 부분은 `RemixServer` 라는 컴포넌트 밖에 없었다. [소스코드](https://github.com/remix-run/remix/blob/main/packages/remix-react/server.tsx)를 살펴보니, 서버측 HTML 렌더링을 위해 데이터, 라우팅, 스트리밍 관련 설정을 담당하는 컴포넌트인 것 같았다. RemixServer 컴포넌트의 내부 구현까지 정리하면, 글이 너무 길어질 것 같아서 나중에(?) 해보기로 하고 React 18에서 새로 추가된 API인  `renderToPipeableStream` 을 위주로 SSR되는 과정을 살펴보려고 한다.
+
+# renderToPipeableStream이란?
+
+<Image src={'/ssr/ssr-blog-image-2.png'} alt={'remix-ssr-image-2'} />
+
+React 18에 추가된 SSR 메서드로 기존 SSR의 문제점인 느린 초기 페이지 로딩이나, 큰 HTML 파일 로드시 브라우저에서의 하이드레이션 부하 등을 개선하기 위해 새롭게 소개된 기능이다.
+
+[공식문서](https://react.dev/reference/react-dom/server/renderToPipeableStream)에 따르면, 리액트 트리를 pipeable Node.js Stream으로 렌더링하는 함수라고 정의되어 있다.
+
+## Pipeable한 Node.js Stream?
+
+조금 생소한 개념이 나왔다.
+
+[Node.js의 Stream](https://nodejs.org/api/stream.html#writable-streams)은 데이터를 청크 단위로 쪼개서 읽거나 사용할 수 있는 Node.js 의 추상화된 객체이다. 대용량 데이터를 메모리 효율적으로 처리할 때 많이 사용된다고 한다.
+
+```tsx
+const fs = require('fs');
+
+const readStream = fs.createReadStream('largeFile.txt', 'utf8');
+
+readStream.on('data', (chunk) => {
+  console.log(chunk);
+});
+```
+
+예를 들어 위와 같이 Readable Stream을 만들면, 큰 파일을 작은 청크 단위로 쪼개서 읽어올 수 있다.  스트림 객체에는 아래 네가지 종류는 아래와 같다.
+
+- Readable Stream (읽기 전용)
+  - 데이터를 생산하는 소스 (ex .파일, HTTP 요청, 데이터 베이스 등)와 연결
+- Writable Stream (쓰기 전용)
+  - 데이터를 목적지로 전달 (ex. 파일에 쓰기, HTTP 응답에 사용 등)
+- Duplex Stream (읽고, 쓰기 전용)
+  - TCP 연결을 관리하는 스트림을 데이터를 읽고 쓸 수 있음
+- Transform Stream (읽고 변환한 후 쓰는 스트림)
+  - 데이터를 처리하면서 변경하거나, 변환할 수 있는 스트림 (ex. 압축, 암호화, 인코딩 변환 등)
+
+이제 다시 React로 돌아와서,
+
+`renderToPipeableStream` 에서는 이 스트림 객체를 사용해서 효율적인 데이터 전송과 빠른 렌더링을 지원한다. (이후에 보면 알겠지만 컴포넌트 파일을 읽어서 스트림객체로 만들고, HTTP 응답으로 주기 때문에 Readable, Writable 스트림을 사용하게 된다. )
+
+스트리밍 방식을 사용하면 초기 페이지 로딩을 여러 청크로 쪼개서 비동기적으로 처리할 수 있다는 장점이 있다. 당연히 한번다 다 읽고, 만들어서, 반환하는 것보다는 성능이 좋을 것이라고 예상을 해볼 수 있을 것 같다.
+
+아래는 공식문서에 나온 예제인데, 쉽게 설명해보자면 App 컴포넌트 HTML으로 렌더링하고 > 스트리밍 객체로 변환해서 > 해당 스트리밍 객체를 HTTP 응답으로 전송하는 코드라고 볼 수 있다.
+
+환경마다 달라 질 수 있겠지만 React의 스트리밍 SSR 기능을 활용하려면 대략 아래와 같은 코드로 작성하면 된다고 공식문서에 적혀 있었다.
+
+```tsx
+import { renderToPipeableStream } from 'react-dom/server';
+
+// The route handler syntax depends on your backend framework
+app.use('/', (request, response) => {
+  const { pipe } = renderToPipeableStream(<App />, {
+    bootstrapScripts: ['/main.js'],
+    onShellReady() {
+      response.setHeader('content-type', 'text/html');
+      pipe(response);
+    }
+  });
+});
+```
+
+그럼 이제 renderToPipeableStream 메소드의 동작에 대해서 대략 이해했으니, 해당 함수의 API와 반환 객체에 대해 간단하게 필요한 것만 정리해보고, Remix의 entry.server.tsx 로 넘어가보자. 🤩
+
+```tsx
+renderToPipeableStream(reactNode, options?)
+```
+
+- **Parameters**
+  - `reactNode`: HTML로 렌더링하고 싶은 리액트 노드 (보통은 App과 같은 루트 노드)
+  - options
+    - `bootstrapScripts(optional)` : script tag에 삽입할 URL 경로 배열 (클라이언트에서 hydrateRoot 호출시 사용)
+- Returns
+  - `pipe`: 제공된 HTML을 Writable Node.js Stream으로 출력. `onShellReady` 에서 호출하면 스트리밍을 활성화 할 수 있음
+
+# Remix에서의 SSR
+
+```tsx
+
+function handleBrowserRequest(
+  request: Request,
+  responseStatusCode: number,
+  responseHeaders: Headers,
+  remixContext: EntryContext
+) {
+  return new Promise((resolve, reject) => {
+    let shellRendered = false;
+    const { pipe, abort } = renderToPipeableStream(
+      <RemixServer
+        context={remixContext}
+        url={request.url}
+        abortDelay={ABORT_DELAY}
+      />,
+      {
+        onShellReady() {
+          shellRendered = true;
+          const body = new PassThrough();
+          const stream = createReadableStreamFromReadable(body);
+
+          responseHeaders.set("Content-Type", "text/html");
+
+          resolve(
+            new Response(stream, {
+              headers: responseHeaders,
+              status: responseStatusCode,
+            })
+          );
+
+          pipe(body);
+        },
+        onShellError(error: unknown) {
+          reject(error);
+        },
+        onError(error: unknown) {
+          responseStatusCode = 500;
+          // Log streaming rendering errors from inside the shell.  Don't log
+          // errors encountered during initial shell rendering since they'll
+          // reject and get logged in handleDocumentRequest.
+          if (shellRendered) {
+            console.error(error);
+          }
+        },
+      }
+    );
+
+    setTimeout(abort, ABORT_DELAY);
+  });
+}
+```
+
+Remix(v2.15.3) 에서 Server-side에서 실행되는 `handleBrowserRequest` 의 전체 코드이다.  자세한 흐름은 아래와 같다.
+
+### 1. 스트리밍 렌더링 설정
+
+```tsx
+const { pipe, abort } = renderToPipeableStream(
+  <RemixServer context={remixContext} url={request.url} abortDelay={ABORT_DELAY} />,
+  {
+    // 콜백 함수들
+  }
+);
+```
+
+먼저 renderToPipeableStream 함수의 첫번째 인자로 RemixServer 컴포넌트를 받아 서버사이드 렌더링을 위한 준비를 하고(데이터 로드, 라우팅 설정 등..), 스트리밍할 HTML을 렌더링한다.
+
+### 2. onShellReady 콜백 (스트리밍 처리)
+
+```tsx
+onShellReady() {
+  shellRendered = true;
+  const body = new PassThrough();
+  const stream = createReadableStreamFromReadable(body);
+
+  responseHeaders.set("Content-Type", "text/html");
+
+  resolve(
+    new Response(stream, {
+      headers: responseHeaders,
+      status: responseStatusCode,
+    })
+  );
+
+  pipe(body);
+```
+
+onShellReady 콜백 함수는 React HTML 렌더링이 완료됐을 때 호출된다. 즉, React 트리의 초기 셸이 준비됐을 때 실행된다.
+
+PassThrough는 Node.js에서 스트리밍 데이터 처리를 위한 기본 스트림 클래스이다. (아무런 변형 없이 쓰기 쪽에서 읽기 쪽으로 데이터를 넘기는 스트림으로 파이프라인을 만들때 사용되는 클래스라고 한다.) PassThrough 스트림을 HTTP 응답 스트림으로 사용할 수 있도록 ReadableStream 으로 변환하고, 최종적으로 HTTP을 반환한다.
+
+그리고 renderToPipeableStream에서 반환된 pipe 메소드를 사용해서 렌더링된 HTML을 body 스트림으로 파이프한다. 이 메소드 호출이 실제로 렌더링된 HTML을 클라이언트로 점진적으로 전송하는 부분이라고 볼 수 있을 것 같다.
+
+### 3. onShellError
+
+렌더링 중에 초기 셸 렌더링에 실패할 경우 호출된다. 프로미스를 reject한다. (서버에서만 에러가 발생하고 따로 HTTP응답은 반환되지 않는다.)
+
+### 4. onError
+
+렌더링 중 발생한 다른 일반적인 에러를 처리한다. responseStatusCode를 500으로 설정하고, 에러를 콘솔에 기록한다. (초기 렌더링이 완료된 이후에)
+
+### 5. 타임아웃 처리
+
+타임아웃이 발생하면 렌더링을 중단하고, 응답을 반환한다.
+
+# 실제 스트리밍된 결과물
+
+이제 Server-side에서의 스트리밍 비밀을 알았으니, 실제 브라우저에서 스트리밍(?)이 잘되는지 확인해보자.  간단히 비동기 컴포넌트와 Suspense를 활용해서 Streaming SSR를 Remix 작성해봤다.
+
+```tsx
+import {Suspense} from "react";
+import {Await} from "@remix-run/react";
+
+const loadData = async (): Promise<{ title: string, description: string }> => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({title: 'Title', description: 'Description'});
+        }, 1000);
+    });
+}
+
+export default function Index() {
+    return (
+        <>
+            <div>Home</div>
+            <Suspense fallback="Loading...">
+                <Await resolve={loadData()}>
+                    {(data) => (
+                        <>
+                            <h1>{data.title}</h1>
+                            <span>{data.description}</span>
+                        </>
+                    )}
+                </Await>
+            </Suspense>
+            <Suspense fallback="Loading...">
+                <Await resolve={loadData()}>
+                    {(data) => (
+                        <>
+                            <h1>{data.title}</h1>
+                            <span>{data.description}</span>
+                        </>
+                    )}
+                </Await>
+            </Suspense>
+        </>
+    );
+}
+```
+
+위 페이지로 접속했을 때 네트워크 탭에서 확인해본 응답 헤더이다.
+
+<Image src={'/ssr/ssr-blog-image-3.png'} alt={'remix-ssr-image-3'} />
+
+[`Transfer-Encoding: chunked` 라는 헤더](https://developer.mozilla.org/ko/docs/Web/HTTP/Headers/Transfer-Encoding)가 적용된것을 확인할 수 있다(HTTP/1.1 스펙). HTTP 지속 커넥션에서는 본문을 쓰기 전에 반드시 Content-Length 헤더에 본문의 길이를 담아서 보내줘야 한다. 하지만 콘텐츠가 서버에서 동적으로 생성되는 경우에는 보내기 전에 본문의 길이를 알아내는 것이 불가능하다. 청크 인코딩은 서버가 본문을 여러 청크로 쪼개 보낼 수 있게 해준다.
+
+브라우저는 남은 Chunk의 길이가 0이 될때까지 커넥션을 닫지 않고 기다리면서 TCP/IP 핸드셰이크 비용을 절약 할 수 있다.
+
+<Image src={'/ssr/ssr-blog-image-4.png'} alt={'remix-ssr-image-4'} />
+
+개발자 도구에서는 최종 결과물만 들어오기 때문에 데이터가 들어오는 과정을 확인해보려면 직접 통신되는 내용을 찍어봐야 된다고 한다. [이 블로그](https://saengmotmi.netlify.app/react/streaming_ssr/)를 참고해서 확인해봤다.
+
+```tsx
+http.get("http://localhost:5173/", (res) => {
+  res.on("data", (chunk) => {
+    console.log("Received chunk: ", chunk.toString());
+  });
+
+  res.on("end", () => {
+    console.log("Response finished.");
+  });
+}).on("error", (err) => {
+  console.error("Error: ", err.message);
+});'
+```
+
+<Image src={'/ssr/ssr-blog-image-5.png'} alt={'remix-ssr-image-5'} />
+
+이제 HTTP 스트리밍 통신에서의 비밀도 알게 되었다..😇
+
+# 마무리
+
+이렇게 Remix의 SSR에 대해서 알아보았다. 그리고 React의 renderToPipeableStream 함수의 동작 원리와, 그 결과물에 대해도 살펴보면서 스트리밍 SSR에 대해서도 간략히 정리해봤다. Next.js보다 추상화가 덜 되어있는 Remix 덕분에 이런 호기심도 생기고, 더 간략하게 SSR의 동작에 대해서 살펴볼 수 있었던것 같다.
+
+Streaming 기법 말고도 SSR을 최적화하기 위한 기법들이 많이 소개되고 있다. 기존에 잘 알고 있던 SSG 부터, 서버 컴포넌트, 하이드레이션 최적화 (Suspense를 통한 우선순위 조정), CDN 캐싱 등. 각 기법들이 소개됐을 때 그대로 받아들이기 보다는 어떤 문제를 해결하기 위해 나온 기능인지를 살펴보고, 동작원리를 잘 이해해서 사용하는 것이 중요하다는 생각이 들었다.
+
+# 참고하면 좋을 자료
+- https://react.dev/reference/react-dom/server/renderToPipeableStream#rendering-a-react-tree-as-html-to-a-nodejs-stream
+- https://remix.run/docs/en/main/components/await
+- https://github.com/remix-run/remix/blob/main/packages/remix-react/server.tsx
+- https://developer.mozilla.org/ko/docs/Web/HTTP/Headers/Transfer-Encoding
+- https://saengmotmi.netlify.app/react/streaming_ssr/
