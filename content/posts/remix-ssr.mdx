@@ -1,5 +1,5 @@
 ---
-title: Remix의 SSR, React 18 renderToPipeableStream을 위주로 살펴보기
+title: Remix의 스트리밍 SSR, React 18 renderToPipeableStream을 위주로 살펴보기
 description: Remix 프로젝트를 생성하면서 entry.server.tsx 파일에 있는 renderToPipeableStream를 발견했다. 어떤 역할을 하는 함수인지 알아보자 💪
 date: "2025-02-02"
 imageUrl: /ssr/ssr-blog-image-3.png
@@ -93,7 +93,7 @@ renderToPipeableStream(reactNode, options?)
 - Returns
   - `pipe`: 제공된 HTML을 Writable Node.js Stream으로 출력. `onShellReady` 에서 호출하면 스트리밍을 활성화 할 수 있음
 
-# Remix에서의 SSR
+# Remix에서의 스트리밍 SSR
 
 ```tsx
 
